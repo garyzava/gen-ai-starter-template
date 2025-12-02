@@ -1,0 +1,72 @@
+[project]
+name = "genai-project"
+version = "0.1.0"
+description = "A production-ready Generative AI project template."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+dependencies = [
+    # Core Utilities
+    "pydantic>=2.9.0",          # Data validation & schema definition
+    "pydantic-settings>=2.6.0", # 12-factor app configuration management
+    "python-dotenv>=1.0.0",     # Loading .env files
+    
+    # LLM & AI Logic
+    "openai>=1.50.0",           # OpenAI SDK (Standard for many LLM APIs)
+    "tiktoken>=0.8.0",          # Token counting utilities
+    "tenacity>=9.0.0",          # Retrying API calls (Essential for production)
+    
+    # Vector Database (Example: Chroma)
+    "chromadb>=0.5.0",          # Local vector storage
+    
+    # Observability (Optional but recommended)
+    "loguru>=0.7.2",            # Better logging than standard library
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# UV Specific Configuration
+# -------------------------
+[tool.uv]
+package = true
+
+# Development Dependencies (install with `uv sync --dev`)
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",            # Testing framework
+    "pytest-asyncio>=0.24.0",   # Async support for tests
+    "ruff>=0.7.0",              # Fast linter & formatter
+    "mypy>=1.13.0",             # Static type checker
+    "jupyter>=1.1.0",           # For running notebooks
+    "ipykernel>=6.29.0",        # Python kernel for Jupyter
+]
+
+# Tool Configurations
+# -------------------
+
+# 1. Pytest Config
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+
+# 2. Ruff Config (Linter & Formatter)
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]  # Errors, Pyflakes, Imports (sorting), Warnings
+ignore = []
+
+# 3. Mypy Config (Type Checker)
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true # Useful for some AI libs that lack types
