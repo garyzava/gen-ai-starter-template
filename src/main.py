@@ -1,4 +1,5 @@
 from src.config.settings import settings
+from src.llm.config import LLMConfig
 
 
 def main():
@@ -10,10 +11,17 @@ def main():
     # Printing settings.OPENAI_API_KEY directly will show '**********'
     _ = settings.OPENAI_API_KEY.get_secret_value()  # Validate key exists
 
-    print(f"Using Model: {settings.LLM_MODEL}")
-    print(f"Temp: {settings.LLM_TEMPERATURE}")
+    # 3. Configuration follows 12-factor principles:
+    #    - Secrets (API keys) from environment via settings
+    #    - Behavioral config (temperature, etc.) from code defaults via LLMConfig
+    print(f"Using Model: {settings.DEFAULT_LLM_MODEL}")
 
-    # 3. Path objects are already standard python Pathlibs
+    # LLMConfig provides validated defaults for behavioral settings
+    default_config = LLMConfig()
+    print(f"Default Temp: {default_config.temperature}")
+    print(f"Default Max Tokens: {default_config.max_tokens}")
+
+    # 4. Path objects are already standard python Pathlibs
     if not settings.VECTOR_DB_PATH.exists():
         settings.VECTOR_DB_PATH.mkdir(parents=True, exist_ok=True)
         print(f"Created database at: {settings.VECTOR_DB_PATH}")

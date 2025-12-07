@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 from src.config.settings import settings
+from src.llm.config import LLMConfig
 from src.main import main
 
 
@@ -15,8 +16,18 @@ class TestMain:
 
         captured = capsys.readouterr()
         assert settings.APP_NAME in captured.out
-        assert settings.LLM_MODEL in captured.out
-        assert "Temp:" in captured.out
+        assert settings.DEFAULT_LLM_MODEL in captured.out
+        assert "Default Temp:" in captured.out
+        assert "Default Max Tokens:" in captured.out
+
+    def test_main_prints_llm_config_defaults(self, capsys):
+        """Test that main prints LLMConfig default values."""
+        main()
+
+        captured = capsys.readouterr()
+        default_config = LLMConfig()
+        assert str(default_config.temperature) in captured.out
+        assert str(default_config.max_tokens) in captured.out
 
     def test_main_creates_vector_db_directory(self, mock_settings):
         """Test that main creates the vector DB directory if it doesn't exist."""

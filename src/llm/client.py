@@ -1,48 +1,83 @@
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional, Union, Dict, Any
 
 from openai import APIError, AsyncOpenAI
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from src.config.settings import settings
 from src.llm.base import BaseLLMClient
+from src.llm.config import LLMConfig
 from src.schemas.chat import LLMResponse, Message, Role
 
 # Configure logger
 logger = logging.getLogger(__name__)
 
+
 class OpenAIClient(BaseLLMClient):
     """
     Concrete implementation of BaseLLMClient for OpenAI.
     Handles retries, authentication, and response parsing.
+
+    Configuration follows 12-factor principles:
+    - API key (secret) comes from environment via settings
+    - Behavioral config (temperature, etc.) uses LLMConfig with validation
+
+    Usage:
+        # Basic usage with defaults
+        client = OpenAIClient()
+        response = await client.achat(messages)
+
+        # With custom config
+        config = LLMConfig(temperature=0.5, max_tokens=500)
+        response = await client.achat(messages, config=config)
+
+        # With advanced features (OpenAI-specific)
+        config = LLMConfig(temperature=0.5, seed=12345, frequency_penalty=0.5)
+        response = await client.achat(messages, config=config)
+
+        # Override config per-request
+        response = await client.achat(messages, config={"temperature": 0.9})
     """
 
-    def __init__(self):
-        super().__init__()
-        # AsyncOpenAI automatically finds OPENAI_API_KEY in env,
-        # but passing it explicitly from settings is safer/clearer.
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        default_config: Optional[Union[LLMConfig, Dict[str, Any]]] = None
+    ):
+        super().__init__(api_key=api_key, model=model, default_config=default_config)
         self.client = AsyncOpenAI(api_key=self.api_key)
 
     @retry(
-        retry=retry_if_exception_type(APIError), # Retry on 500s, 429s
-        wait=wait_exponential(multiplier=1, min=4, max=10), # Wait 4s, 8s, 10s...
-        stop=stop_after_attempt(3), # Stop after 3 tries
+        retry=retry_if_exception_type(APIError),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        stop=stop_after_attempt(3),
         reraise=True
     )
-    async def achat(self, messages: list[Message], temperature: float = None) -> LLMResponse:
+    async def achat(
+        self,
+        messages: list[Message],
+        config: Optional[Union[LLMConfig, Dict[str, Any]]] = None
+    ) -> LLMResponse:
         """
         Non-streaming chat completion with automatic retries.
+
+        Args:
+            messages: List of conversation messages
+            config: Optional LLMConfig or dict to override defaults
+
+        Returns:
+            LLMResponse with content and token usage stats
         """
-        temp = temperature if temperature is not None else settings.LLM_TEMPERATURE
+        resolved_config = self._resolve_config(config)
         formatted_msgs = self._format_messages(messages)
+        api_params = resolved_config.to_api_params()
 
         try:
-            logger.debug(f"Sending request to {self.model}...")
+            logger.debug(f"Sending request to {self.model} with config: {api_params}")
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=formatted_msgs,
-                temperature=temp,
-                max_tokens=settings.MAX_TOKENS
+                **api_params
             )
 
             # Extract content
@@ -61,30 +96,38 @@ class OpenAIClient(BaseLLMClient):
                 content=content,
                 role=Role.ASSISTANT,
                 token_usage=token_stats,
-                # Store the raw response if you need deep debugging later
-                # raw_response=response
             )
 
         except Exception as e:
             logger.error(f"OpenAI Chat Error: {e}")
-            raise
+            raise RuntimeError(f"OpenAI Chat Error: {e}") from e
 
     async def astream(
-        self, messages: list[Message], temperature: float = None
+        self,
+        messages: list[Message],
+        config: Optional[Union[LLMConfig, Dict[str, Any]]] = None
     ) -> AsyncGenerator[str, None]:
         """
         Streaming chat completion.
-        Note: Retries on streams are trickier; usually handled at the connection level.
+
+        Args:
+            messages: List of conversation messages
+            config: Optional LLMConfig or dict to override defaults
+
+        Yields:
+            String chunks of the response
         """
-        temp = temperature if temperature is not None else settings.LLM_TEMPERATURE
+        resolved_config = self._resolve_config(config)
         formatted_msgs = self._format_messages(messages)
+
+        # Force stream=True for streaming
+        api_params = resolved_config.to_api_params()
+        api_params["stream"] = True
 
         stream = await self.client.chat.completions.create(
             model=self.model,
             messages=formatted_msgs,
-            temperature=temp,
-            max_tokens=settings.MAX_TOKENS,
-            stream=True
+            **api_params
         )
 
         async for chunk in stream:

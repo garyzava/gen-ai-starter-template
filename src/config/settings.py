@@ -7,30 +7,52 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Define the root of the project to help with absolute paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
+
 class Settings(BaseSettings):
     """
     Application Settings configuration.
-    Validates environment variables on startup.
+
+    Following 12-factor app principles:
+    - SECRETS (from .env): API keys, credentials - things that vary between deploys
+      and must be kept secure
+    - CONFIGURATION (code defaults): Behavioral settings with sensible defaults
+      that can be overridden programmatically
+
+    Secrets are loaded from environment variables / .env file.
+    Configuration defaults are defined in code (LLMConfig) and can be
+    overridden at runtime.
     """
 
-    # --- General App Config ---
+    # ===========================================================================
+    # SECRETS - Loaded from environment variables / .env file
+    # ===========================================================================
+
+    # LLM Provider API Keys
+    # SecretStr prevents the value from being displayed in logs/reprs
+    OPENAI_API_KEY: SecretStr = Field(..., description="Required OpenAI API Key")
+
+    # Add other secrets here as needed:
+    # ANTHROPIC_API_KEY: Optional[SecretStr] = None
+    # DATABASE_URL: Optional[SecretStr] = None
+
+    # ===========================================================================
+    # APPLICATION CONFIG - Defaults defined in code, not in .env
+    # ===========================================================================
+
+    # General App Config
     APP_NAME: str = "GenAI Project"
     ENVIRONMENT: Literal["development", "production", "testing"] = "development"
     DEBUG: bool = False
 
-    # --- LLM Configuration ---
-    # SecretStr prevents the value from being displayed in logs/reprs
-    OPENAI_API_KEY: SecretStr = Field(..., description="Required OpenAI API Key")
+    # Default LLM model (can be overridden per-request via LLMConfig)
+    DEFAULT_LLM_MODEL: str = "gpt-4-turbo"
 
-    # Validation: Temperature must be between 0.0 and 2.0
-    LLM_TEMPERATURE: float = Field(default=0.7, ge=0.0, le=2.0)
-    LLM_MODEL: str = "gpt-4-turbo"
-    MAX_TOKENS: int = 1000
-
-    # --- Vector Database Config ---
+    # Vector Database Config
     VECTOR_DB_PATH: Path = Field(default=PROJECT_ROOT / "data" / "chroma_db")
 
-    # --- Config Boilerplate ---
+    # ===========================================================================
+    # Config Boilerplate
+    # ===========================================================================
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
