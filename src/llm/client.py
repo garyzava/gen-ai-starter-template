@@ -1,12 +1,12 @@
 import logging
 from typing import AsyncGenerator
 
-from openai import AsyncOpenAI, APIError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from openai import APIError, AsyncOpenAI
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.config.settings import settings
 from src.llm.base import BaseLLMClient
-from src.schemas.chat import Message, LLMResponse, Role
+from src.schemas.chat import LLMResponse, Message, Role
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class OpenAIClient(BaseLLMClient):
 
     def __init__(self):
         super().__init__()
-        # AsyncOpenAI automatically finds OPENAI_API_KEY in env, 
+        # AsyncOpenAI automatically finds OPENAI_API_KEY in env,
         # but passing it explicitly from settings is safer/clearer.
         self.client = AsyncOpenAI(api_key=self.api_key)
 
@@ -44,11 +44,11 @@ class OpenAIClient(BaseLLMClient):
                 temperature=temp,
                 max_tokens=settings.MAX_TOKENS
             )
-            
+
             # Extract content
             raw_choice = response.choices[0]
             content = raw_choice.message.content or ""
-            
+
             # Extract usage stats
             usage = response.usage
             token_stats = {
@@ -62,16 +62,18 @@ class OpenAIClient(BaseLLMClient):
                 role=Role.ASSISTANT,
                 token_usage=token_stats,
                 # Store the raw response if you need deep debugging later
-                # raw_response=response 
+                # raw_response=response
             )
 
         except Exception as e:
             logger.error(f"OpenAI Chat Error: {e}")
             raise
 
-    async def astream(self, messages: list[Message], temperature: float = None) -> AsyncGenerator[str, None]:
+    async def astream(
+        self, messages: list[Message], temperature: float = None
+    ) -> AsyncGenerator[str, None]:
         """
-        Streaming chat completion. 
+        Streaming chat completion.
         Note: Retries on streams are trickier; usually handled at the connection level.
         """
         temp = temperature if temperature is not None else settings.LLM_TEMPERATURE

@@ -1,6 +1,8 @@
 from enum import Enum
-from typing import Optional, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class Role(str, Enum):
     """Standardized roles for conversation history."""
@@ -29,5 +31,8 @@ class LLMResponse(BaseModel):
     content: str
     role: Role = Role.ASSISTANT
     # Usage stats (useful for cost tracking)
-    token_usage: dict[str, int] = Field(default_factory=lambda: {"input": 0, "output": 0, "total": 0})
-    raw_response: Any = Field(default=None, exclude=True) # Keep original API response for debugging
+    token_usage: dict[str, int] = Field(
+        default_factory=lambda: {"input": 0, "output": 0, "total": 0}
+    )
+    # Keep original API response for debugging
+    raw_response: Any = Field(default=None, exclude=True)

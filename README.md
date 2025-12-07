@@ -76,10 +76,14 @@ You don't need to activate the environment. Use uv run to execute commands insid
 * Run Tests:
 
 ```Bash
-uv run pytest
+uv run pytestv -v
 ```
 
 * Run Linter:
+
+Checks your Python code for errors, style issues, and potential bugs
+It's extremely fast (10-100x faster than traditional linters like flake8 or pylint)
+Can detect issues like unused imports, undefined variables, formatting problems, etc
 
 ```Bash
 uv run ruff check .
@@ -88,7 +92,8 @@ uv run ruff check .
 * Run a Script:
 
 ```Bash
-uv run python src/examples/simple_rag.py
+# you have to create the .env and add your OpenAI API first
+uv run python src/examples/verify_setup.py
 ```
 
 * Start Jupyter:

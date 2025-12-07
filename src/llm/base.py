@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Optional
 
-from src.schemas.chat import Message, LLMResponse
 from src.config.settings import settings
+from src.schemas.chat import LLMResponse, Message
+
 
 class BaseLLMClient(ABC):
     """
@@ -14,7 +15,7 @@ class BaseLLMClient(ABC):
         # Allow overrides, but default to settings
         self.api_key = api_key or settings.OPENAI_API_KEY.get_secret_value()
         self.model = model or settings.LLM_MODEL
-    
+
     @abstractmethod
     async def achat(self, messages: list[Message], temperature: float = 0.7) -> LLMResponse:
         """
@@ -24,7 +25,9 @@ class BaseLLMClient(ABC):
         pass
 
     @abstractmethod
-    async def astream(self, messages: list[Message], temperature: float = 0.7) -> AsyncGenerator[str, None]:
+    async def astream(
+        self, messages: list[Message], temperature: float = 0.7
+    ) -> AsyncGenerator[str, None]:
         """
         Stream the response chunk by chunk (critical for good UX).
         Must be implemented by subclasses.
@@ -37,6 +40,6 @@ class BaseLLMClient(ABC):
         Can be overridden if a provider needs a weird format.
         """
         return [
-            {"role": msg.role.value, "content": msg.content} 
+            {"role": msg.role.value, "content": msg.content}
             for msg in messages
         ]
