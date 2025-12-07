@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Any
 
 from src.config.settings import settings
 from src.schemas.chat import LLMResponse, Message
@@ -9,6 +9,9 @@ class BaseLLMClient(ABC):
     """
     Abstract Base Class for all LLM providers (OpenAI, Anthropic, etc.).
     Enforces a standard interface so the rest of the app doesn't care which model is used.
+
+    Configuration is centralized in settings with validation.
+    Use **overrides for per-request parameter changes.
     """
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
@@ -17,20 +20,38 @@ class BaseLLMClient(ABC):
         self.model = model or settings.LLM_MODEL
 
     @abstractmethod
-    async def achat(self, messages: list[Message], temperature: float = 0.7) -> LLMResponse:
+    async def achat(
+        self,
+        messages: list[Message],
+        **overrides: Any
+    ) -> LLMResponse:
         """
         Send a chat request to the LLM and get a complete response.
-        Must be implemented by subclasses.
+
+        Args:
+            messages: List of conversation messages
+            **overrides: Override any LLM parameter (e.g., temperature=0.5)
+
+        Returns:
+            LLMResponse with content and metadata
         """
         pass
 
     @abstractmethod
     async def astream(
-        self, messages: list[Message], temperature: float = 0.7
+        self,
+        messages: list[Message],
+        **overrides: Any
     ) -> AsyncGenerator[str, None]:
         """
         Stream the response chunk by chunk (critical for good UX).
-        Must be implemented by subclasses.
+
+        Args:
+            messages: List of conversation messages
+            **overrides: Override any LLM parameter (e.g., temperature=0.5)
+
+        Yields:
+            String chunks of the response
         """
         pass
 

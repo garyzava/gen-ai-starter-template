@@ -163,6 +163,7 @@ def mock_settings(tmp_path):
     mock.ENVIRONMENT = real_settings.ENVIRONMENT
     mock.LLM_MODEL = real_settings.LLM_MODEL
     mock.LLM_TEMPERATURE = real_settings.LLM_TEMPERATURE
+    mock.LLM_MAX_TOKENS = real_settings.LLM_MAX_TOKENS
     mock.OPENAI_API_KEY = real_settings.OPENAI_API_KEY
     # Override path to use temp directory for tests
     mock.VECTOR_DB_PATH = tmp_path / "test_db"

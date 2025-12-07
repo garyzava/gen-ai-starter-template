@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 
 from openai import APIError, AsyncOpenAI
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -11,38 +11,62 @@ from src.schemas.chat import LLMResponse, Message, Role
 # Configure logger
 logger = logging.getLogger(__name__)
 
+
 class OpenAIClient(BaseLLMClient):
     """
     Concrete implementation of BaseLLMClient for OpenAI.
     Handles retries, authentication, and response parsing.
+
+    All configuration comes from settings with per-request overrides via **kwargs.
+
+    Usage:
+        client = OpenAIClient()
+
+        # Use settings defaults
+        response = await client.achat(messages)
+
+        # Override specific params
+        response = await client.achat(messages, temperature=0.5, max_tokens=500)
+
+        # Stream with overrides
+        async for chunk in client.astream(messages, temperature=0.9):
+            print(chunk, end="")
     """
 
     def __init__(self):
         super().__init__()
-        # AsyncOpenAI automatically finds OPENAI_API_KEY in env,
-        # but passing it explicitly from settings is safer/clearer.
         self.client = AsyncOpenAI(api_key=self.api_key)
 
     @retry(
-        retry=retry_if_exception_type(APIError), # Retry on 500s, 429s
-        wait=wait_exponential(multiplier=1, min=4, max=10), # Wait 4s, 8s, 10s...
-        stop=stop_after_attempt(3), # Stop after 3 tries
+        retry=retry_if_exception_type(APIError),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        stop=stop_after_attempt(3),
         reraise=True
     )
-    async def achat(self, messages: list[Message], temperature: float = None) -> LLMResponse:
+    async def achat(
+        self,
+        messages: list[Message],
+        **overrides: Any
+    ) -> LLMResponse:
         """
         Non-streaming chat completion with automatic retries.
+
+        Args:
+            messages: List of conversation messages
+            **overrides: Override any LLM parameter (e.g., temperature=0.5)
+
+        Returns:
+            LLMResponse with content and token usage stats
         """
-        temp = temperature if temperature is not None else settings.LLM_TEMPERATURE
         formatted_msgs = self._format_messages(messages)
+        params = settings.get_llm_params(**overrides)
 
         try:
-            logger.debug(f"Sending request to {self.model}...")
+            logger.debug(f"Sending request to {self.model} with params: {params}")
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=formatted_msgs,
-                temperature=temp,
-                max_tokens=settings.MAX_TOKENS
+                **params
             )
 
             # Extract content
@@ -61,30 +85,34 @@ class OpenAIClient(BaseLLMClient):
                 content=content,
                 role=Role.ASSISTANT,
                 token_usage=token_stats,
-                # Store the raw response if you need deep debugging later
-                # raw_response=response
             )
 
         except Exception as e:
             logger.error(f"OpenAI Chat Error: {e}")
-            raise
+            raise RuntimeError(f"OpenAI Chat Error: {e}") from e
 
     async def astream(
-        self, messages: list[Message], temperature: float = None
+        self,
+        messages: list[Message],
+        **overrides: Any
     ) -> AsyncGenerator[str, None]:
         """
         Streaming chat completion.
-        Note: Retries on streams are trickier; usually handled at the connection level.
+
+        Args:
+            messages: List of conversation messages
+            **overrides: Override any LLM parameter (e.g., temperature=0.5)
+
+        Yields:
+            String chunks of the response
         """
-        temp = temperature if temperature is not None else settings.LLM_TEMPERATURE
         formatted_msgs = self._format_messages(messages)
+        params = settings.get_llm_params(stream=True, **overrides)
 
         stream = await self.client.chat.completions.create(
             model=self.model,
             messages=formatted_msgs,
-            temperature=temp,
-            max_tokens=settings.MAX_TOKENS,
-            stream=True
+            **params
         )
 
         async for chunk in stream:
